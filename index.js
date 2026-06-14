@@ -3,7 +3,9 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// 1. BITCOIN-COMPLIANT RIPEMD-160 CALCULATOR
+// =========================================================================
+// 1. BITCOIN-COMPLIANT RIPEMD-160 ENGINE (Pure JS Optimized for Node)
+// =========================================================================
 function bitcoinRipemd160ForSha256(sha256Bytes) {
     const X = new Uint32Array(16);
     for (let i = 0; i < 8; i++) {
@@ -54,7 +56,9 @@ function bitcoinRipemd160ForSha256(sha256Bytes) {
     return out;
 }
 
+// =========================================================================
 // 2. SECP256K1 CURVE OPERATIONS
+// =========================================================================
 const P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2Fn;
 function modInverse(a, m) {
     let m0 = m, y = 0n, x = 1n; if (m === 1n) return 0n;
@@ -104,11 +108,12 @@ function deriveCompressedPublicKeyBytes(privateKeyBigInt) {
 
 const bytesToHex = (bytes) => Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 
-// 3. NATIVE EXPRESS PARSING MIDDLEWARE (REPLACES BODY-PARSER COMPLETELY)
+// =========================================================================
+// 3. NATIVE EXPRESS PARSING MIDDLEWARE & CORS LAYERS
+// =========================================================================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS headers configuration 
 app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -117,55 +122,9 @@ app.use((req, res, next) => {
     next();
 });
 
-// 4. SCANNING API ROUTE
-app.get('/api/scan', async (req, res) => {
-    const startHex = req.query.start || "";
-    const targetHash160 = req.query.target || "";
-    const count = parseInt(req.query.count || "5");
-
-    if (!startHex || !targetHash160) {
-        return res.status(400).json({ error: "Missing required parameters" });
-    }
-
-    try {
-        let currentKeyBig = BigInt("0x" + startHex.replace(/^0x/i, '').trim());
-        const cleanTarget = targetHash160.trim().toLowerCase();
-        
-        let matchFound = false;
-        let winningKey = "";
-        let keysCheckedCounter = 0;
-
-        for (let i = 0; i < count; i++) {
-            const pubKeyBytes = deriveCompressedPublicKeyBytes(currentKeyBig);
-            const sha256Bytes = new Uint8Array(crypto.createHash('sha256').update(pubKeyBytes).digest());
-            const hash160Bytes = bitcoinRipemd160ForSha256(sha256Bytes);
-            const currentHash160Hex = bytesToHex(hash160Bytes);
-
-            if (currentHash160Hex === cleanTarget) { 
-                matchFound = true;
-                winningKey = currentKeyBig.toString(16).padStart(64, '0');
-                break;
-            }
-            currentKeyBig++;
-            keysCheckedCounter++;
-        }
-
-        return res.json({
-            found: matchFound, 
-            winningKey: winningKey,
-            lastScanned: currentKeyBig.toString(16), 
-            keysChecked: keysCheckedCounter
-        });
-
-    } catch (err) {
-        return res.status(500).json({ error: err.message, found: false });
-    }
-});
-
-app.listen(PORT, () => console.log(`Northflank Scanning Engine running on port ${PORT}`));
-    if (req.method === "OPTIONS") return res.sendStatus(200);
-    next();
-});
+// =========================================================================
+// 4. ACTIVE CORE SCANNING ROUTE METHOD
+// =========================================================================
 app.get('/api/scan', async (req, res) => {
     const startHex = req.query.start || "";
     const targetHash160 = req.query.target || "";
